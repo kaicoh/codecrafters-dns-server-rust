@@ -43,6 +43,13 @@ impl Header {
             ..self
         }
     }
+
+    pub fn set_an(self, an: u16) -> Self {
+        Self {
+            num_of_an: an,
+            ..self
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
