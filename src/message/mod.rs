@@ -1,5 +1,5 @@
 use crate::{utils, Error, Result};
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Seek, SeekFrom};
 
 mod answer;
 mod header;
@@ -128,7 +128,39 @@ impl DomainName {
         Self("codecrafters.io".into())
     }
 
-    fn new<R: Read>(r: &mut R) -> Result<Self> {
+    fn new(cursor: &mut Cursor<&[u8]>) -> Result<Self> {
+        let mut byte = utils::read_1_byte(cursor)?;
+        let mut tokens: Vec<Vec<u8>> = vec![];
+
+        while byte != 0 {
+            if byte & 0b11000000 == 0b11000000 {
+                let b0 = byte & 0b00111111;
+                let b1 = utils::read_1_byte(cursor)?;
+
+                let p: u64 = u16::from_be_bytes([b0, b1]) as u64;
+                let mut c = Cursor::new(*(cursor.get_ref()));
+                c.seek(SeekFrom::Start(p))?;
+
+                let mut pointed_tokens = Self::uncompressed_tokens(&mut c)?;
+                tokens.append(&mut pointed_tokens);
+                byte = 0;
+            } else {
+                let bytes = utils::read_n_bytes(cursor, byte as usize)?;
+                tokens.push(bytes);
+                byte = utils::read_1_byte(cursor)?;
+            }
+        }
+
+        let val = tokens
+            .into_iter()
+            .filter_map(|bytes| String::from_utf8(bytes).ok())
+            .collect::<Vec<String>>()
+            .join(".");
+
+        Ok(Self(val))
+    }
+
+    fn uncompressed_tokens<R: Read>(r: &mut R) -> Result<Vec<Vec<u8>>> {
         let mut len: usize = utils::read_1_byte(r)? as usize;
         let mut tokens: Vec<Vec<u8>> = vec![];
 
@@ -139,13 +171,7 @@ impl DomainName {
             len = utils::read_1_byte(r)? as usize;
         }
 
-        let val = tokens
-            .into_iter()
-            .filter_map(|bytes| String::from_utf8(bytes).ok())
-            .collect::<Vec<String>>()
-            .join(".");
-
-        Ok(Self(val))
+        Ok(tokens)
     }
 }
 

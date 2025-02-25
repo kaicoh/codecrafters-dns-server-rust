@@ -1,6 +1,6 @@
 use super::{DomainName, RecordType};
 use crate::{utils, Result};
-use std::io::Read;
+use std::io::Cursor;
 
 #[derive(Debug)]
 pub struct Question {
@@ -18,11 +18,11 @@ impl Question {
         }
     }
 
-    pub fn new<R: Read>(r: &mut R) -> Result<Self> {
-        let name = DomainName::new(r)?;
-        let bytes = utils::read_2_bytes(r)?;
+    pub fn new(cursor: &mut Cursor<&[u8]>) -> Result<Self> {
+        let name = DomainName::new(cursor)?;
+        let bytes = utils::read_2_bytes(cursor)?;
         let r#type = RecordType::from_bytes(bytes);
-        let _ = utils::read_2_bytes(r)?;
+        let _ = utils::read_2_bytes(cursor)?;
 
         Ok(Self {
             name,
