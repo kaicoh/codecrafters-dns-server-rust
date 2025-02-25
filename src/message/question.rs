@@ -1,4 +1,6 @@
 use super::{DomainName, RecordType};
+use crate::{utils, Result};
+use std::io::Read;
 
 #[derive(Debug)]
 pub struct Question {
@@ -14,6 +16,19 @@ impl Question {
             r#type: RecordType::A,
             class: 1,
         }
+    }
+
+    pub fn new<R: Read>(r: &mut R) -> Result<Self> {
+        let name = DomainName::new(r)?;
+        let bytes = utils::read_2_bytes(r)?;
+        let r#type = RecordType::from_bytes(bytes);
+        let _ = utils::read_2_bytes(r)?;
+
+        Ok(Self {
+            name,
+            r#type,
+            class: 1,
+        })
     }
 
     pub fn as_bytes(&self) -> Vec<u8> {

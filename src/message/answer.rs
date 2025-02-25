@@ -1,4 +1,6 @@
 use super::{DomainName, RecordType};
+use crate::{utils, Result};
+use std::io::Read;
 
 #[derive(Debug)]
 pub struct Answer {
@@ -18,6 +20,29 @@ impl Answer {
             ttl: 60,
             data: Rdata::A([8, 8, 8, 8]),
         }
+    }
+
+    pub fn new<R: Read>(r: &mut R) -> Result<Self> {
+        let name = DomainName::new(r)?;
+        let bytes = utils::read_2_bytes(r)?;
+        let r#type = RecordType::from_bytes(bytes);
+        let _ = utils::read_2_bytes(r)?;
+
+        let bytes = utils::read_4_bytes(r)?;
+        let ttl = u32::from_be_bytes(bytes);
+
+        let _length = utils::read_2_bytes(r)?;
+
+        let bytes = utils::read_4_bytes(r)?;
+        let data = Rdata::A(bytes);
+
+        Ok(Self {
+            name,
+            r#type,
+            class: 1,
+            ttl,
+            data,
+        })
     }
 
     pub fn as_bytes(&self) -> Vec<u8> {

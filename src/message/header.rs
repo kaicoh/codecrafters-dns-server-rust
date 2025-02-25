@@ -1,3 +1,6 @@
+use crate::{utils, Result};
+use std::io::Read;
+
 // Ref: https://en.wikipedia.org/wiki/Domain_Name_System#DNS_message_format
 #[derive(Debug)]
 pub struct Header {
@@ -37,6 +40,30 @@ impl Header {
         }
     }
 
+    pub fn copy_from(header: Self) -> Self {
+        let Self { id, opcode, rd, .. } = header;
+
+        Self {
+            id,
+            opcode,
+            rd,
+            rcode: if matches!(opcode, OpCode::Query) {
+                Rcode::NoErr
+            } else {
+                Rcode::NotImplemented
+            },
+            ..Self::test()
+        }
+    }
+
+    pub fn error() -> Self {
+        Self {
+            id: TransactionId(0),
+            rcode: Rcode::ServerErr,
+            ..Self::test()
+        }
+    }
+
     pub fn set_qs(self, qs: u16) -> Self {
         Self {
             num_of_qs: qs,
@@ -63,7 +90,6 @@ impl TransactionId {
 
 #[derive(Debug, Clone, Copy)]
 pub enum Qr {
-    #[allow(unused)]
     Query,
     Reply,
 }
@@ -75,15 +101,22 @@ impl Qr {
             Self::Reply => 0b10000000,
         }
     }
+
+    fn from_byte(byte: u8) -> Self {
+        if bit_flag(0b10000000, byte) {
+            Self::Reply
+        } else {
+            Self::Query
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
 pub enum OpCode {
     Query,
-    #[allow(unused)]
     Iquery,
-    #[allow(unused)]
     Status,
+    Unknown(u8),
 }
 
 impl OpCode {
@@ -92,6 +125,17 @@ impl OpCode {
             Self::Query => 0b00000000,
             Self::Iquery => 0b00001000,
             Self::Status => 0b00010000,
+            Self::Unknown(bits) => *bits,
+        }
+    }
+
+    fn from_byte(byte: u8) -> Self {
+        let bits = byte & 0b01111000;
+        match bits {
+            0b00000000 => Self::Query,
+            0b00001000 => Self::Iquery,
+            0b00010000 => Self::Status,
+            _ => Self::Unknown(bits),
         }
     }
 }
@@ -99,12 +143,10 @@ impl OpCode {
 #[derive(Debug, Clone, Copy)]
 pub enum Rcode {
     NoErr,
-    #[allow(unused)]
     FormatErr,
-    #[allow(unused)]
     ServerErr,
-    #[allow(unused)]
     NonexistentDomain,
+    NotImplemented,
 }
 
 impl Rcode {
@@ -114,6 +156,17 @@ impl Rcode {
             Self::FormatErr => 0b00000001,
             Self::ServerErr => 0b00000010,
             Self::NonexistentDomain => 0b00000011,
+            Self::NotImplemented => 0b00000100,
+        }
+    }
+
+    fn from_byte(byte: u8) -> Self {
+        match byte & 0b00001111 {
+            0b00000000 => Self::NoErr,
+            0b00000001 => Self::FormatErr,
+            0b00000010 => Self::ServerErr,
+            0b00000011 => Self::NonexistentDomain,
+            _ => Self::NotImplemented,
         }
     }
 }
@@ -131,6 +184,10 @@ impl AuthAnswer {
             0b00000000
         }
     }
+
+    fn from_byte(byte: u8) -> Self {
+        Self(bit_flag(0b00000100, byte))
+    }
 }
 
 // Truncation (TC)
@@ -145,6 +202,10 @@ impl Truncation {
         } else {
             0b00000000
         }
+    }
+
+    fn from_byte(byte: u8) -> Self {
+        Self(bit_flag(0b00000010, byte))
     }
 }
 
@@ -161,6 +222,10 @@ impl RecursionDesired {
             0b00000000
         }
     }
+
+    fn from_byte(byte: u8) -> Self {
+        Self(bit_flag(0b00000001, byte))
+    }
 }
 
 // Recursion Available (RA)
@@ -175,6 +240,10 @@ impl RecursionAvailable {
         } else {
             0b00000000
         }
+    }
+
+    fn from_byte(byte: u8) -> Self {
+        Self(bit_flag(0b10000000, byte))
     }
 }
 
@@ -191,6 +260,10 @@ impl AuthenticData {
             0b00000000
         }
     }
+
+    fn from_byte(byte: u8) -> Self {
+        Self(bit_flag(0b00100000, byte))
+    }
 }
 
 // Checking Disabled (CD)
@@ -205,6 +278,10 @@ impl CheckingDisable {
         } else {
             0b00000000
         }
+    }
+
+    fn from_byte(byte: u8) -> Self {
+        Self(bit_flag(0b00010000, byte))
     }
 }
 
@@ -228,6 +305,61 @@ fn flag_byte_2nd_half(
 }
 
 impl Header {
+    pub fn new<R: Read>(r: &mut R) -> Result<Self> {
+        let bytes = utils::read_2_bytes(r)?;
+        let id = TransactionId(u16::from_be_bytes(bytes));
+
+        let flag_1st = utils::read_1_byte(r)?;
+        let qr = Qr::from_byte(flag_1st);
+        let opcode = OpCode::from_byte(flag_1st);
+        let aa = AuthAnswer::from_byte(flag_1st);
+        let tc = Truncation::from_byte(flag_1st);
+        let rd = RecursionDesired::from_byte(flag_1st);
+
+        let flag_2nd = utils::read_1_byte(r)?;
+        let ra = RecursionAvailable::from_byte(flag_2nd);
+        let ad = AuthenticData::from_byte(flag_2nd);
+        let cd = CheckingDisable::from_byte(flag_2nd);
+        let rcode = Rcode::from_byte(flag_2nd);
+
+        let bytes = utils::read_2_bytes(r)?;
+        let num_of_qs = u16::from_be_bytes(bytes);
+
+        let bytes = utils::read_2_bytes(r)?;
+        let num_of_an = u16::from_be_bytes(bytes);
+
+        let bytes = utils::read_2_bytes(r)?;
+        let num_of_authorities = u16::from_be_bytes(bytes);
+
+        let bytes = utils::read_2_bytes(r)?;
+        let num_of_additionals = u16::from_be_bytes(bytes);
+
+        Ok(Self {
+            id,
+            qr,
+            opcode,
+            aa,
+            tc,
+            rd,
+            ra,
+            ad,
+            cd,
+            rcode,
+            num_of_qs,
+            num_of_an,
+            num_of_authorities,
+            num_of_additionals,
+        })
+    }
+
+    pub fn num_of_qs(&self) -> u16 {
+        self.num_of_qs
+    }
+
+    pub fn num_of_an(&self) -> u16 {
+        self.num_of_an
+    }
+
     pub fn as_bytes(&self) -> [u8; 12] {
         let Self {
             id,
@@ -256,4 +388,8 @@ impl Header {
 
         [b0, b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11]
     }
+}
+
+fn bit_flag(mask: u8, byte: u8) -> bool {
+    byte & mask == mask
 }

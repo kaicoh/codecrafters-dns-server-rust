@@ -1,3 +1,6 @@
+use crate::{utils, Error, Result};
+use std::io::{Cursor, Read};
+
 mod answer;
 mod header;
 mod question;
@@ -14,15 +17,23 @@ pub struct Message {
 }
 
 impl Message {
-    pub fn test() -> Self {
+    pub fn test(msg: Self) -> Self {
         let msg = Self {
-            header: Header::test(),
+            header: Header::copy_from(msg.header),
             questions: vec![],
             answers: vec![],
         };
 
         msg.set_question(Question::test())
             .set_answer(Answer::test())
+    }
+
+    pub fn error() -> Self {
+        Self {
+            header: Header::error(),
+            questions: vec![],
+            answers: vec![],
+        }
     }
 
     pub fn set_question(self, q: Question) -> Self {
@@ -59,6 +70,31 @@ impl Message {
     }
 }
 
+impl TryFrom<&[u8]> for Message {
+    type Error = Error;
+
+    fn try_from(bytes: &[u8]) -> Result<Self> {
+        let mut cursor = Cursor::new(bytes);
+        let header = Header::new(&mut cursor)?;
+
+        let mut questions: Vec<Question> = vec![];
+        for _ in 0..header.num_of_qs() {
+            questions.push(Question::new(&mut cursor)?);
+        }
+
+        let mut answers: Vec<Answer> = vec![];
+        for _ in 0..header.num_of_an() {
+            answers.push(Answer::new(&mut cursor)?);
+        }
+
+        Ok(Self {
+            header,
+            questions,
+            answers,
+        })
+    }
+}
+
 #[derive(Debug)]
 struct DomainName(String);
 
@@ -74,6 +110,26 @@ impl DomainName {
     fn test() -> Self {
         Self("codecrafters.io".into())
     }
+
+    fn new<R: Read>(r: &mut R) -> Result<Self> {
+        let mut len: usize = utils::read_1_byte(r)? as usize;
+        let mut tokens: Vec<Vec<u8>> = vec![];
+
+        while len > 0 {
+            let bytes = utils::read_n_bytes(r, len)?;
+            tokens.push(bytes);
+
+            len = utils::read_1_byte(r)? as usize;
+        }
+
+        let val = tokens
+            .into_iter()
+            .filter_map(|bytes| String::from_utf8(bytes).ok())
+            .collect::<Vec<String>>()
+            .join(".");
+
+        Ok(Self(val))
+    }
 }
 
 fn label_part(substr: &str) -> Vec<u8> {
@@ -87,35 +143,20 @@ fn label_part(substr: &str) -> Vec<u8> {
 #[derive(Debug, Clone, Copy)]
 pub enum RecordType {
     A,
-    #[allow(unused)]
     Ns,
-    #[allow(unused)]
     Md,
-    #[allow(unused)]
     Mf,
-    #[allow(unused)]
     Cname,
-    #[allow(unused)]
     Soa,
-    #[allow(unused)]
     Mb,
-    #[allow(unused)]
     Mg,
-    #[allow(unused)]
     Mr,
-    #[allow(unused)]
     Null,
-    #[allow(unused)]
     Wks,
-    #[allow(unused)]
     Ptr,
-    #[allow(unused)]
     Hinfo,
-    #[allow(unused)]
     Minfo,
-    #[allow(unused)]
     Mx,
-    #[allow(unused)]
     Txt,
 }
 
@@ -143,6 +184,28 @@ impl RecordType {
 
     fn as_bytes(&self) -> [u8; 2] {
         self.as_u16().to_be_bytes()
+    }
+
+    fn from_bytes(bytes: [u8; 2]) -> Self {
+        match u16::from_be_bytes(bytes) {
+            1 => Self::A,
+            2 => Self::Ns,
+            3 => Self::Md,
+            4 => Self::Mf,
+            5 => Self::Cname,
+            6 => Self::Soa,
+            7 => Self::Mb,
+            8 => Self::Mg,
+            9 => Self::Mr,
+            10 => Self::Null,
+            11 => Self::Wks,
+            12 => Self::Ptr,
+            13 => Self::Hinfo,
+            14 => Self::Minfo,
+            15 => Self::Mx,
+            16 => Self::Txt,
+            _ => panic!("Unexpected bytes: {bytes:?}"),
+        }
     }
 }
 
