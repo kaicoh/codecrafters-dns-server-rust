@@ -1,20 +1,3 @@
-#[derive(Debug)]
-pub struct Message {
-    header: Header,
-}
-
-impl Message {
-    pub fn test() -> Self {
-        Self {
-            header: Header::test(),
-        }
-    }
-
-    pub fn as_bytes(&self) -> [u8; 12] {
-        self.header.as_bytes()
-    }
-}
-
 // Ref: https://en.wikipedia.org/wiki/Domain_Name_System#DNS_message_format
 #[derive(Debug)]
 pub struct Header {
@@ -53,13 +36,20 @@ impl Header {
             num_of_additionals: 0,
         }
     }
+
+    pub fn set_qs(self, qs: u16) -> Self {
+        Self {
+            num_of_qs: qs,
+            ..self
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct TransactionId(u16);
 
 impl TransactionId {
-    fn bytes(&self) -> [u8; 2] {
+    fn as_bytes(&self) -> [u8; 2] {
         self.0.to_be_bytes()
     }
 }
@@ -249,7 +239,7 @@ impl Header {
             num_of_additionals,
         } = self;
 
-        let [b0, b1] = id.bytes();
+        let [b0, b1] = id.as_bytes();
         let b2 = flag_byte_1st_half(qr, opcode, aa, tc, rd);
         let b3 = flag_byte_2nd_half(ra, ad, cd, rcode);
         let [b4, b5] = num_of_qs.to_be_bytes();
