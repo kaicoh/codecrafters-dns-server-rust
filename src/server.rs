@@ -1,10 +1,9 @@
-use crate::{err, Result};
+use crate::{err, message::Message, Result};
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 
 const BUF_SIZE: usize = 512;
 
-type OutgoingMessage = Vec<u8>;
-type Handler = dyn Fn(&[u8]) -> OutgoingMessage;
+type Handler = dyn Fn(&[u8]) -> Message;
 
 pub struct Server {
     addr: SocketAddr,
@@ -28,7 +27,7 @@ impl Server {
 
     pub fn handler<F>(self, handler: F) -> Self
     where
-        F: Fn(&[u8]) -> OutgoingMessage + 'static,
+        F: Fn(&[u8]) -> Message + 'static,
     {
         Self {
             handler: Some(Box::new(handler)),
@@ -43,7 +42,7 @@ impl Server {
 
         while let Ok((size, addr)) = socket.recv_from(&mut buf) {
             let msg = handler(&buf[..size]);
-            socket.send_to(&msg, addr)?;
+            socket.send_to(&msg.as_bytes(), addr)?;
             buf = clean_buf();
         }
 

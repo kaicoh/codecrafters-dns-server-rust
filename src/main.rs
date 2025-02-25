@@ -10,9 +10,6 @@ fn main() {
 
 fn run() -> Result<()> {
     Server::bind("127.0.0.1:2053")?
-        .handler(|buf| {
-            println!("Received {} bytes", buf.len());
-            vec![]
-        })
+        .handler(cds::handle_message)
         .run()
 }
