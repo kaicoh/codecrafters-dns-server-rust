@@ -1,22 +1,18 @@
-use std::net::UdpSocket;
+use cds::{Result, Server};
+use codecrafters_dns_server as cds;
 
 fn main() {
-    let udp_socket = UdpSocket::bind("127.0.0.1:2053").expect("Failed to bind to address");
-    let mut buf = [0; 512];
-
-    loop {
-        match udp_socket.recv_from(&mut buf) {
-            Ok((size, source)) => {
-                println!("Received {} bytes from {}", size, source);
-                let response = [];
-                udp_socket
-                    .send_to(&response, source)
-                    .expect("Failed to send response");
-            }
-            Err(e) => {
-                eprintln!("Error receiving data: {}", e);
-                break;
-            }
-        }
+    if let Err(err) = run() {
+        eprintln!("{err}");
+        std::process::exit(1);
     }
+}
+
+fn run() -> Result<()> {
+    Server::bind("127.0.0.1:2053")?
+        .handler(|buf| {
+            println!("Received {} bytes", buf.len());
+            vec![]
+        })
+        .run()
 }
