@@ -39,4 +39,16 @@ impl Question {
             .chain(self.class.to_be_bytes())
             .collect()
     }
+
+    pub(super) fn name(&self) -> &DomainName {
+        &self.name
+    }
+
+    pub(super) fn r#type(&self) -> RecordType {
+        self.r#type
+    }
+
+    pub(super) fn class(&self) -> u16 {
+        self.class
+    }
 }

@@ -17,15 +17,32 @@ pub struct Message {
 }
 
 impl Message {
-    pub fn test(msg: Self) -> Self {
-        let msg = Self {
-            header: Header::copy_from(msg.header),
+    pub fn test(self) -> Self {
+        let Self {
+            header, questions, ..
+        } = self;
+
+        let mut msg = Self {
+            header: Header::copy_from(header),
             questions: vec![],
             answers: vec![],
         };
 
-        msg.set_question(Question::test())
-            .set_answer(Answer::test())
+        for q in questions {
+            msg = msg.set_question(q);
+        }
+
+        let answers = msg
+            .questions
+            .iter()
+            .map(Answer::from)
+            .collect::<Vec<Answer>>();
+
+        for a in answers {
+            msg = msg.set_answer(a);
+        }
+
+        msg
     }
 
     pub fn error() -> Self {
@@ -95,7 +112,7 @@ impl TryFrom<&[u8]> for Message {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct DomainName(String);
 
 impl DomainName {

@@ -1,4 +1,4 @@
-use super::{DomainName, RecordType};
+use super::{question::Question, DomainName, RecordType};
 use crate::{utils, Result};
 use std::io::Read;
 
@@ -73,6 +73,18 @@ impl Rdata {
     fn as_bytes(&self) -> Vec<u8> {
         match self {
             Self::A(bytes) => bytes.to_vec(),
+        }
+    }
+}
+
+impl From<&Question> for Answer {
+    fn from(q: &Question) -> Self {
+        Self {
+            name: q.name().clone(),
+            r#type: q.r#type(),
+            class: q.class(),
+            ttl: 60,
+            data: Rdata::A([8, 8, 8, 8]),
         }
     }
 }
