@@ -21,10 +21,10 @@ pub struct Header {
 }
 
 impl Header {
-    pub fn test() -> Self {
+    pub fn new_query(id: u16) -> Self {
         Self {
-            id: TransactionId(1234),
-            qr: Qr::Reply,
+            id: TransactionId(id),
+            qr: Qr::Query,
             opcode: OpCode::Query,
             aa: AuthAnswer(false),
             tc: Truncation(false),
@@ -40,27 +40,47 @@ impl Header {
         }
     }
 
-    pub fn copy_from(header: Self) -> Self {
+    pub fn new_reply(header: Self) -> Self {
         let Self { id, opcode, rd, .. } = header;
 
         Self {
             id,
+            qr: Qr::Reply,
             opcode,
+            aa: AuthAnswer(false),
+            tc: Truncation(false),
             rd,
+            ra: RecursionAvailable(false),
+            ad: AuthenticData(false),
+            cd: CheckingDisable(false),
             rcode: if matches!(opcode, OpCode::Query) {
                 Rcode::NoErr
             } else {
                 Rcode::NotImplemented
             },
-            ..Self::test()
+            num_of_qs: 0,
+            num_of_an: 0,
+            num_of_authorities: 0,
+            num_of_additionals: 0,
         }
     }
 
     pub fn error() -> Self {
         Self {
             id: TransactionId(0),
+            qr: Qr::Reply,
+            opcode: OpCode::Query,
+            aa: AuthAnswer(false),
+            tc: Truncation(false),
+            rd: RecursionDesired(false),
+            ra: RecursionAvailable(false),
+            ad: AuthenticData(false),
+            cd: CheckingDisable(false),
             rcode: Rcode::ServerErr,
-            ..Self::test()
+            num_of_qs: 0,
+            num_of_an: 0,
+            num_of_authorities: 0,
+            num_of_additionals: 0,
         }
     }
 
@@ -77,6 +97,10 @@ impl Header {
             ..self
         }
     }
+
+    pub fn id(&self) -> TransactionId {
+        self.id
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -85,6 +109,10 @@ pub struct TransactionId(u16);
 impl TransactionId {
     fn as_bytes(&self) -> [u8; 2] {
         self.0.to_be_bytes()
+    }
+
+    pub fn as_u16(&self) -> u16 {
+        self.0
     }
 }
 

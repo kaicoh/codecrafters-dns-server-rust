@@ -5,43 +5,43 @@ mod answer;
 mod header;
 mod question;
 
-use answer::Answer;
-use header::Header;
-use question::Question;
+pub use answer::Answer;
+pub use header::Header;
+pub use question::Question;
 
 #[derive(Debug)]
 pub struct Message {
-    header: Header,
-    questions: Vec<Question>,
-    answers: Vec<Answer>,
+    pub header: Header,
+    pub questions: Vec<Question>,
+    pub answers: Vec<Answer>,
 }
 
 impl Message {
-    pub fn test(self) -> Self {
-        let Self {
-            header, questions, ..
-        } = self;
-
-        let mut msg = Self {
-            header: Header::copy_from(header),
+    fn new(header: Header) -> Self {
+        Self {
+            header,
             questions: vec![],
             answers: vec![],
-        };
+        }
+    }
+
+    pub fn reply(msg: Self) -> Self {
+        let Self {
+            header, questions, ..
+        } = msg;
+
+        let mut msg = Self::new(Header::new_reply(header));
 
         for q in questions {
             msg = msg.set_question(q);
         }
 
-        let answers = msg
-            .questions
-            .iter()
-            .map(Answer::from)
-            .collect::<Vec<Answer>>();
+        msg
+    }
 
-        for a in answers {
-            msg = msg.set_answer(a);
-        }
-
+    pub fn query(id: u16, q: &Question) -> Self {
+        let mut msg = Self::new(Header::new_query(id));
+        msg = msg.set_question(q.clone());
         msg
     }
 
@@ -85,6 +85,10 @@ impl Message {
             .chain(self.answers.iter().flat_map(Answer::as_bytes))
             .collect()
     }
+
+    pub fn id(&self) -> u16 {
+        self.header.id().as_u16()
+    }
 }
 
 impl TryFrom<&[u8]> for Message {
@@ -122,10 +126,6 @@ impl DomainName {
             .flat_map(label_part)
             .chain([0u8])
             .collect()
-    }
-
-    fn test() -> Self {
-        Self("codecrafters.io".into())
     }
 
     fn new(cursor: &mut Cursor<&[u8]>) -> Result<Self> {

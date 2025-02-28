@@ -1,4 +1,5 @@
-use cds::{Result, Server};
+use cds::{Args, Result, Server};
+use clap::Parser;
 use codecrafters_dns_server as cds;
 
 fn main() {
@@ -9,7 +10,9 @@ fn main() {
 }
 
 fn run() -> Result<()> {
+    let args = Args::parse();
+
     Server::bind("127.0.0.1:2053")?
-        .handler(cds::handle_message)
+        .resolver(args.resolver)?
         .run()
 }

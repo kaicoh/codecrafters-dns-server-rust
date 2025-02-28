@@ -2,7 +2,7 @@ use super::{DomainName, RecordType};
 use crate::{utils, Result};
 use std::io::Cursor;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Question {
     name: DomainName,
     r#type: RecordType,
@@ -10,14 +10,6 @@ pub struct Question {
 }
 
 impl Question {
-    pub fn test() -> Self {
-        Self {
-            name: DomainName::test(),
-            r#type: RecordType::A,
-            class: 1,
-        }
-    }
-
     pub fn new(cursor: &mut Cursor<&[u8]>) -> Result<Self> {
         let name = DomainName::new(cursor)?;
         let bytes = utils::read_2_bytes(cursor)?;

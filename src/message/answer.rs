@@ -12,16 +12,6 @@ pub struct Answer {
 }
 
 impl Answer {
-    pub fn test() -> Self {
-        Self {
-            name: DomainName::test(),
-            r#type: RecordType::A,
-            class: 1,
-            ttl: 60,
-            data: Rdata::A([8, 8, 8, 8]),
-        }
-    }
-
     pub fn new(cursor: &mut Cursor<&[u8]>) -> Result<Self> {
         let name = DomainName::new(cursor)?;
         let bytes = utils::read_2_bytes(cursor)?;
